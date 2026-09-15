@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import requests
 from datetime import datetime
 from mcp.server.mcpserver import MCPServer
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 mcp = MCPServer("mcp-poc to use tools")
 
@@ -140,7 +140,7 @@ def web_search(query: str) -> str:
     
     try:
         with DDGS() as ddgs:
-            result = list(ddgs.text(query, max_results=5))
+            result = list(ddgs.text(query, max_results=5,backend="lite"))
             
         if not result:
             return f"NO Result Found For This Query: {query}"

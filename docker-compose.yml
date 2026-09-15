@@ -1,0 +1,14 @@
+services:
+  tool:
+    build: ./tools
+    ports:
+      - "8000:8000"
+
+  app:
+    build: ./app
+    ports:
+      - "8080:8080"
+    environment:
+      - MCP_SERVER_URL=http://tool:8000/sse
+    depends_on:
+      - tool
