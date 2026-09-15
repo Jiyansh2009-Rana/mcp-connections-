@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+groq
+mcp>=2.0.0
+pydantic
+python-dotenv
