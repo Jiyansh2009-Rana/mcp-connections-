@@ -14,14 +14,29 @@ app = FastAPI()
 groq_client = AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL_NAME = "llama-3.3-70b-versatile"
 MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8000/sse")
+MCP_AUTH_TOKEN = os.getenv("MCP_AUTH_TOKEN")
 
 class ChatRequest(BaseModel):
     message: str
 
+
+
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
-    # Connect to the SSE endpoint using sse_client
-    async with sse_client(MCP_SERVER_URL) as (read_stream, write_stream):
+
+    clean_url = MCP_SERVER_URL.strip()
+
+    custom_headers = {
+        "Authorization": f"Bearer {MCP_AUTH_TOKEN}",
+        "Accept": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+    }
+
+    async with sse_client(
+        clean_url,
+        headers=custom_headers
+    ) as (read_stream, write_stream):
         async with ClientSession(read_stream, write_stream) as client:
             await client.initialize()
             

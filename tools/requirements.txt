@@ -1,7 +1,9 @@
-mcp>=2.0.0
 pydantic[email]
 pyairtable
 python-dotenv
 requests
+mcp<2
 duckduckgo-search
 ddgs
+uvicorn
+fastapi

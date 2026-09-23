@@ -7,10 +7,20 @@ from pyairtable.formulas import match
 from dotenv import load_dotenv
 import requests
 from datetime import datetime
-from mcp.server.mcpserver import MCPServer
+from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from ddgs import DDGS
+import uvicorn
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from mcp.server.sse import SseServerTransport
 
-mcp = MCPServer("mcp-poc to use tools")
+mcp = FastMCP(
+    "mcp-poc to use tools",
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False
+    )
+)
 
 load_dotenv()
 
@@ -19,9 +29,15 @@ WEATHER_KEY = os.getenv("WEATHER_KEY")
 AIRTABLE_PAT = os.getenv("AIRTABLE_PAT")
 AIRTABLE_BASE_ID = os.getenv("AIRTABLE_BASE_ID")
 AIRTABLE_TABLE_NAME = os.getenv("AIRTABLE_TABLE_NAME")
+MCP_AUTH_TOKEN = os.getenv("MCP_AUTH_TOKEN")
 
 api = Api(AIRTABLE_PAT)
 table = api.table(AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME)
+
+app = FastAPI()
+
+
+sse_transport = SseServerTransport("/messages")
 
 class ItemBase(BaseModel):
     Name: str
@@ -53,6 +69,7 @@ def format_record_output(record_result):
         "record_id": record_result.get("id", "N/A"),
         "data": fields
     }
+
 
 @mcp.tool()
 def create_item(item: ItemCreate):
@@ -159,5 +176,26 @@ def web_search(query: str) -> str:
     except Exception as e:
         return f"An error occurred during the web search: {str(e)}"
 
+@app.middleware("http")
+async def verify_mcp_auth(request: Request, call_next):
+
+    if request.url.path in ["/sse", "/messages"]:
+        auth_header = request.headers.get("Authorization")
+
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return JSONResponse(status_code=401, content={"detail": "Missing or invalid token format"})
+
+        token = auth_header.split(" ")[1]
+        if token != MCP_AUTH_TOKEN:
+            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    return await call_next(request)
+
+@app.get("/health")
+async def health_check():
+    return {"status": "My server is running fine!"}
+
+app.mount("/", mcp.sse_app())
+
 if __name__ == "__main__":
-    mcp.run(transport="sse", host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
